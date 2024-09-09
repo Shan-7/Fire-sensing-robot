@@ -1,57 +1,47 @@
-#include <Servo.h>         
-#include <NewPing.h>        
+#include <Servo.h>          // Servo motor library
+#include <NewPing.h>        // Ultrasonic sensor function library
 
-const int LeftMotorForward = 7;
+// L298N control pins
+const int LeftMotorForward = 3;
 const int LeftMotorBackward = 6;
 const int RightMotorForward = 5;
-const int RightMotorBackward = 4;
+const int RightMotorBackward = 11;
+const int buzzerPin = 13;   // Buzzer pin
+const int analogSensorPin = A0;  // Analog sensor pin
 
-const int ForwardLED = 8;
-const int BackwardLED = 9;
-const int LeftLED = 11;
-const int RightLED = 12;
-const int LeftSensorLED = 13;
-const int RightSensorLED = 3;
-
-const int LeftIRSensor = A3;  
-const int RightIRSensor = A4; 
-const int Buzzer = 2;         
-
-#define trig_pin A1 
-#define echo_pin A2 
+// Ultrasonic sensor pins
+#define trig_pin A1 // analog input 1
+#define echo_pin A2 // analog input 2
 
 #define maximum_distance 200
 boolean goesForward = false;
 int distance = 100;
 
-NewPing sonar(trig_pin, echo_pin, maximum_distance); 
-Servo servo_motor; 
+// Define motor speed (PWM value: 0-255)
+const int motorSpeed = 120;
+
+NewPing sonar(trig_pin, echo_pin, maximum_distance); // sensor function
+Servo servo_motor; // servo name
 
 void setup() {
-
+  // Initialize motor control pins
   pinMode(RightMotorForward, OUTPUT);
   pinMode(LeftMotorForward, OUTPUT);
   pinMode(LeftMotorBackward, OUTPUT);
   pinMode(RightMotorBackward, OUTPUT);
-  pinMode(ForwardLED, OUTPUT);
-  pinMode(BackwardLED, OUTPUT);
-  pinMode(LeftLED, OUTPUT);
-  pinMode(RightLED, OUTPUT);
-  pinMode(LeftSensorLED, OUTPUT);
-  pinMode(RightSensorLED, OUTPUT);
   
-  pinMode(LeftIRSensor, INPUT);  
-  pinMode(RightIRSensor, INPUT); 
-  pinMode(Buzzer, OUTPUT);       
+  // Initialize buzzer and analog sensor pins
+  pinMode(buzzerPin, OUTPUT);  
+  pinMode(analogSensorPin, INPUT);  
 
-  servo_motor.attach(10); 
+  // Attach the servo motor
+  servo_motor.attach(10);
 
+  // Center the servo
   servo_motor.write(115);
   delay(2000);
-  distance = readPing();
-  delay(100);
-  distance = readPing();
-  delay(100);
+
+  // Initialize distance readings
   distance = readPing();
   delay(100);
   distance = readPing();
@@ -59,151 +49,113 @@ void setup() {
 }
 
 void loop() {
-
-  int distanceRight = 0;
-  int distanceLeft = 0;
-  delay(50);
-
-  int fireDetected = checkFire(); 
+  // Read the analog sensor value
+  int sensorValue = analogRead(analogSensorPin);
   
-  if (fireDetected) {
-    moveStop(); 
-    delay(2000); 
-    moveBackward(); 
-    buzzBuzzer(); 
-    delay(1000); 
-    moveStop(); 
-    delay(1000); 
-  } 
-  else if (distance <= 45) {
+  // If the sensor value is below 200, stop the bot and sound the buzzer for 5 seconds
+  if (sensorValue < 200) {
     moveStop();
-    delay(300);
-    moveBackward();
-    delay(400);
-    moveStop();
-    delay(300);
-    distanceRight = lookRight();
-    delay(300);
-    distanceLeft = lookLeft();
-    delay(300);
-
-    if (distance >= distanceLeft) {
-      turnRight();
-      moveStop();
-    } else {
-      turnLeft();
-      moveStop();
-    }
+    digitalWrite(buzzerPin, HIGH);  // Turn on buzzer
+    delay(5000);  // Buzzer on for 5 seconds
+    digitalWrite(buzzerPin, LOW);   // Turn off buzzer
   } else {
-    moveForward();
+    digitalWrite(buzzerPin, LOW);   // Ensure buzzer is off
+    
+    // Proceed with obstacle avoidance logic
+    delay(50);
+
+    if (distance <= 45) {
+      moveStop();
+      delay(300);
+      moveBackward();
+      delay(400);
+      moveStop();
+      delay(300);
+      int distanceRight = lookRight();
+      delay(300);
+      int distanceLeft = lookLeft();
+      delay(300);
+
+      if (distanceRight >= distanceLeft) {
+        turnRight();
+      } else {
+        turnLeft();
+      }
+    } else {
+      moveForward();
+    }
+    
+    // Continuously update distance
+    distance = readPing();
   }
-  distance = readPing();
 }
 
-int lookRight() {  
-  digitalWrite(RightSensorLED, HIGH);
-  delay(200);
-  digitalWrite(RightSensorLED, LOW);
+int lookRight() {
   servo_motor.write(50);
   delay(500);
   int distance = readPing();
   delay(100);
-  servo_motor.write(115);
+  servo_motor.write(115);  // Center the servo back
   return distance;
 }
 
 int lookLeft() {
-  digitalWrite(LeftSensorLED, HIGH);
-  delay(500);
-  digitalWrite(LeftSensorLED, LOW);
   servo_motor.write(170);
   delay(500);
   int distance = readPing();
   delay(100);
-  servo_motor.write(115);
+  servo_motor.write(115);  // Center the servo back
   return distance;
-  delay(100);
 }
 
 int readPing() {
   delay(70);
   int cm = sonar.ping_cm();
   if (cm == 0) {
-    cm = 250;
+    cm = 250;  // If no reading, return max distance
   }
   return cm;
 }
 
 void moveStop() {
-  digitalWrite(RightMotorForward, LOW);
-  digitalWrite(LeftMotorForward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(ForwardLED, LOW);
-  digitalWrite(BackwardLED, LOW);
-  digitalWrite(LeftLED, LOW);
-  digitalWrite(RightLED, LOW);
-  digitalWrite(LeftSensorLED, LOW);
-  digitalWrite(RightSensorLED, LOW);
+  analogWrite(RightMotorForward, 0);
+  analogWrite(LeftMotorForward, 0);
+  analogWrite(RightMotorBackward, 0);
+  analogWrite(LeftMotorBackward, 0);
 }
 
 void moveForward() {
   if (!goesForward) {
     goesForward = true;
-    digitalWrite(LeftMotorForward, HIGH);
-    digitalWrite(RightMotorForward, HIGH);
-    digitalWrite(LeftMotorBackward, LOW);
-    digitalWrite(RightMotorBackward, LOW);
-    digitalWrite(ForwardLED, HIGH);
+    analogWrite(LeftMotorForward, motorSpeed);
+    analogWrite(RightMotorForward, motorSpeed);
+    analogWrite(LeftMotorBackward, 0);
+    analogWrite(RightMotorBackward, 0);
   }
 }
 
 void moveBackward() {
   goesForward = false;
-  digitalWrite(LeftMotorBackward, HIGH);
-  digitalWrite(RightMotorBackward, HIGH);
-  digitalWrite(LeftMotorForward, LOW);
-  digitalWrite(RightMotorForward, LOW);
-  digitalWrite(BackwardLED, HIGH);
+  analogWrite(LeftMotorBackward, motorSpeed);
+  analogWrite(RightMotorBackward, motorSpeed);
+  analogWrite(LeftMotorForward, 0);
+  analogWrite(RightMotorForward, 0);
 }
 
 void turnRight() {
-  digitalWrite(RightLED, HIGH);
-  digitalWrite(LeftMotorForward, HIGH);
-  digitalWrite(RightMotorBackward, HIGH);
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(RightMotorForward, LOW);
+  analogWrite(LeftMotorForward, motorSpeed);
+  analogWrite(RightMotorBackward, motorSpeed);
+  analogWrite(LeftMotorBackward, 0);
+  analogWrite(RightMotorForward, 0);
   delay(2000);
-  digitalWrite(LeftMotorForward, HIGH);
-  digitalWrite(RightMotorForward, HIGH);
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
+  moveForward();  // Move forward after turning
 }
 
 void turnLeft() {
-  digitalWrite(LeftLED, HIGH);
-  digitalWrite(LeftMotorBackward, HIGH);
-  digitalWrite(RightMotorForward, HIGH);
-  digitalWrite(LeftMotorForward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
+  analogWrite(LeftMotorBackward, motorSpeed);
+  analogWrite(RightMotorForward, motorSpeed);
+  analogWrite(LeftMotorForward, 0);
+  analogWrite(RightMotorBackward, 0);
   delay(2000);
-  digitalWrite(LeftMotorForward, HIGH);
-  digitalWrite(RightMotorForward, HIGH);
-  digitalWrite(LeftMotorBackward, LOW);
-  digitalWrite(RightMotorBackward, LOW);
-}
-#Hinmanshu LOW,LOW
-int checkFire() {
-  int leftIRValue = digitalRead(LeftIRSensor);
-  int rightIRValue = digitalRead(RightIRSensor);
-  if (leftIRValue == HIGH || rightIRValue == HIGH) {
-    return 1;
-  }
-  return 0;
-}
-
-void buzzBuzzer() {
-  digitalWrite(Buzzer, HIGH);
-  delay(10000);
-  digitalWrite(Buzzer, LOW);
+  moveForward();  // Move forward after turning
 }
